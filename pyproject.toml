@@ -1,0 +1,32 @@
+[project]
+name = "debate-orchestrator"
+version = "0.1.0"
+description = "Backend orchestrator for a voice-first debate judge system."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+  "pydantic>=2.9.0",
+  "python-dotenv>=1.0.1",
+  "sqlmodel>=0.0.22",
+  "psycopg[binary]>=3.2.0",
+  "redis>=5.2.0",
+  "pgvector>=0.3.6",
+  "langgraph>=0.2.60",
+  "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "httpx>=0.28.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

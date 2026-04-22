@@ -1,0 +1,5 @@
+{
+  "tests/test_api.py::TestClient": true,
+  "tests/test_api.py::test_full_voice_debate_flow": true,
+  "tests/test_api.py::test_rejects_utterance_after_end": true
+}

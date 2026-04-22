@@ -11,9 +11,9 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 class Settings(BaseModel):
     app_name: str = "Debate Orchestrator"
-    live_score_max_delta: int = 8
-    live_score_floor: int = 5
-    live_score_ceiling: int = 95
+    live_score_max_delta: int = 18
+    live_score_floor: int = 10
+    live_score_ceiling: int = 90
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./debate_orchestrator.db")
     database_echo: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")

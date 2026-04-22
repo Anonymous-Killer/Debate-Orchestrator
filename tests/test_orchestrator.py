@@ -128,3 +128,98 @@ def test_audio_payload_uses_transcription_provider():
     assert response.accepted is True
     assert response.transcription_source == "gemini"
     assert response.transcript_text == "Transcribed audio argument from Gemini."
+
+
+def test_live_score_allows_large_but_capped_swings_for_emotional_points():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Public policy", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Pro", stance_b="Con", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text=(
+                "This is about compassion and justice because real families are suffering, "
+                "children face direct harm, and ignoring that human cost is morally indefensible."
+            )
+        ),
+    )
+
+    assert response.live_score.side_a_percent >= 65
+    assert response.live_score.side_b_percent <= 35
+    assert response.live_score.side_a_percent <= 90
+
+
+def test_live_score_penalizes_points_that_conflict_with_side_stance():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Algorithm regulation", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.B),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text=(
+                "We should regulate these systems because they protect children, improve safety, "
+                "and are necessary to prevent harm."
+            )
+        ),
+    )
+
+    assert response.live_score.side_a_percent > 50
+    assert "stated stance" in response.live_score.reasoning_summary
+
+
+def test_live_score_penalizes_ethically_toxic_argument_even_if_stance_aligned():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should abortion be legal?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="If a child is a girl, then we can just abort until a boy is born."
+        ),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert "crowd backlash" in response.live_score.reasoning_summary
+
+
+def test_live_score_penalizes_professional_sounding_discriminatory_argument():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should abortion be legal?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="It should be legal to let us abort any female babies and keep only male ones."
+        ),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert "crowd backlash" in response.live_score.reasoning_summary

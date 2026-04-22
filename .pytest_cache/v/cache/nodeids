@@ -3,6 +3,10 @@
   "tests/test_api.py::test_rejects_utterance_after_end",
   "tests/test_orchestrator.py::test_audio_payload_uses_transcription_provider",
   "tests/test_orchestrator.py::test_full_voice_debate_flow",
+  "tests/test_orchestrator.py::test_live_score_allows_large_but_capped_swings_for_emotional_points",
+  "tests/test_orchestrator.py::test_live_score_penalizes_ethically_toxic_argument_even_if_stance_aligned",
+  "tests/test_orchestrator.py::test_live_score_penalizes_points_that_conflict_with_side_stance",
+  "tests/test_orchestrator.py::test_live_score_penalizes_professional_sounding_discriminatory_argument",
   "tests/test_orchestrator.py::test_rejects_utterance_after_end",
   "tests/test_state_machine.py::test_state_machine_allows_live_capture_flow",
   "tests/test_state_machine.py::test_state_machine_rejects_invalid_transition"

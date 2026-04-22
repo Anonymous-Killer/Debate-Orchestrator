@@ -214,8 +214,10 @@ class DebateOrchestrator:
     def get_verdict(self, session_id: str):
         session = self.repository.get_session(session_id)
         verdict = self.repository.get_verdict(session_id)
-        if verdict is None and session.current_phase == DebatePhase.LIVE_CAPTURE:
-            raise InvalidDebateAction("Verdict is not available until the debate is ended.")
+        if verdict is None:
+            if session.current_phase == DebatePhase.LIVE_CAPTURE:
+                raise InvalidDebateAction("Verdict is not available until the debate is ended.")
+            raise InvalidDebateAction("Verdict is not available for this debate yet.")
         return verdict
 
     def _transition(self, session: DebateSession, target: DebatePhase, payload: dict) -> None:

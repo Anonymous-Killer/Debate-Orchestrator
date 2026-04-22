@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Debate Orchestrator Local UI</title>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --panel: #fffaf2;
+        --ink: #1d2a34;
+        --muted: #65717b;
+        --accent: #b5542f;
+        --accent-dark: #7a3117;
+        --line: #dccfbd;
+        --good: #1f7a57;
+        --bad: #a53d2d;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, #f7d7b2 0, transparent 25%),
+          linear-gradient(180deg, #efe6d6 0%, var(--bg) 100%);
+      }
+      .shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        line-height: 0.95;
+        letter-spacing: -0.03em;
+      }
+      .hero p {
+        margin: 0;
+        max-width: 780px;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 20px;
+      }
+      .panel {
+        background: color-mix(in srgb, var(--panel) 92%, white 8%);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 10px 30px rgba(61, 43, 21, 0.06);
+      }
+      .panel h2 {
+        margin: 0 0 14px;
+        font-size: 1.1rem;
+      }
+      .stack { display: grid; gap: 12px; }
+      .field { display: grid; gap: 6px; }
+      label {
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+      input, textarea, select, button {
+        font: inherit;
+      }
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: #fffdf8;
+        color: var(--ink);
+      }
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 14px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+        transition: transform 120ms ease, background 120ms ease;
+      }
+      button:hover { transform: translateY(-1px); background: var(--accent-dark); }
+      button.secondary { background: #d8c2a7; color: var(--ink); }
+      button.good { background: var(--good); }
+      button.bad { background: var(--bad); }
+      .status {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: #fff4df;
+        border: 1px solid #ecd6ae;
+        color: #80592c;
+        min-height: 46px;
+      }
+      .scoreboard {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: var(--a, 50%) 1fr;
+        width: 100%;
+        min-height: 44px;
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+      }
+      .split .a, .split .b {
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+      }
+      .split .a { background: #d77448; color: white; }
+      .split .b { background: #335f78; color: white; }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .stat {
+        background: #fffdf8;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+      }
+      .stat small {
+        display: block;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .console {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      pre {
+        margin: 0;
+        min-height: 280px;
+        max-height: 460px;
+        overflow: auto;
+        padding: 14px;
+        border-radius: 14px;
+        background: #1c242b;
+        color: #eef4f6;
+        font-family: Consolas, monospace;
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #eadcc7;
+        color: var(--ink);
+        font-size: 0.82rem;
+      }
+      @media (max-width: 980px) {
+        .grid, .console, .meta { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <span class="pill">Local Test Console</span>
+        <h1>Debate Orchestrator</h1>
+        <p>
+          A very basic browser UI for testing the backend without assembling POST requests by hand.
+          Use text utterances for now, then end the debate to trigger the post-debate pipeline.
+        </p>
+      </section>
+
+      <div class="status" id="status">Ready. Create a debate to begin.</div>
+
+      <div class="grid">
+        <aside class="panel stack">
+          <h2>Debate Setup</h2>
+
+          <div class="field">
+            <label for="topic">Topic</label>
+            <textarea id="topic">Should governments regulate social media algorithms?</textarea>
+          </div>
+
+          <div class="field">
+            <label for="participantA">Participant A</label>
+            <input id="participantA" value="side_a" />
+          </div>
+
+          <div class="field">
+            <label for="participantB">Participant B</label>
+            <input id="participantB" value="side_b" />
+          </div>
+
+          <div class="field">
+            <label for="stanceA">Stance A</label>
+            <input id="stanceA" value="Yes" />
+          </div>
+
+          <div class="field">
+            <label for="stanceB">Stance B</label>
+            <input id="stanceB" value="No" />
+          </div>
+
+          <div class="field">
+            <label for="activeSide">Start with side</label>
+            <select id="activeSide">
+              <option value="A">A</option>
+              <option value="B">B</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="sessionId">Session ID</label>
+            <input id="sessionId" placeholder="Filled automatically after create" />
+          </div>
+
+          <div class="button-row">
+            <button id="createBtn">Create Debate</button>
+            <button id="startBtn" class="secondary">Start Debate</button>
+            <button id="refreshBtn" class="secondary">Refresh State</button>
+          </div>
+
+          <h2>Live Debate</h2>
+
+          <div class="field">
+            <label for="utterance">Utterance text</label>
+            <textarea id="utterance" placeholder="Type the current side's point here..."></textarea>
+          </div>
+
+          <div class="button-row">
+            <button id="sendUtteranceBtn">Send Utterance</button>
+            <button id="switchSidesBtn" class="secondary">Switch Sides</button>
+            <button id="endBtn" class="bad">End Debate</button>
+          </div>
+
+          <h2>Results</h2>
+
+          <div class="button-row">
+            <button id="transcriptBtn" class="secondary">Load Transcript</button>
+            <button id="verdictBtn" class="good">Load Verdict</button>
+          </div>
+        </aside>
+
+        <main class="panel">
+          <div class="scoreboard">
+            <h2>Live Crowd Split</h2>
+            <div class="split" id="split" style="--a: 50%">
+              <div class="a" id="scoreA">A 50%</div>
+              <div class="b" id="scoreB">B 50%</div>
+            </div>
+          </div>
+
+          <div class="meta">
+            <div class="stat"><small>Current Phase</small><strong id="phase">INIT</strong></div>
+            <div class="stat"><small>Capture Status</small><strong id="capture">idle</strong></div>
+            <div class="stat"><small>Active Side</small><strong id="side">A</strong></div>
+            <div class="stat"><small>Topic</small><strong id="topicView">-</strong></div>
+          </div>
+
+          <div class="console">
+            <div class="stack">
+              <h2>Session State</h2>
+              <pre id="sessionState">{}</pre>
+            </div>
+            <div class="stack">
+              <h2>Transcript / Verdict</h2>
+              <pre id="detailState">{}</pre>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        sessionId: "",
+        session: null,
+      };
+
+      const els = {
+        topic: document.getElementById("topic"),
+        participantA: document.getElementById("participantA"),
+        participantB: document.getElementById("participantB"),
+        stanceA: document.getElementById("stanceA"),
+        stanceB: document.getElementById("stanceB"),
+        activeSide: document.getElementById("activeSide"),
+        sessionId: document.getElementById("sessionId"),
+        utterance: document.getElementById("utterance"),
+        status: document.getElementById("status"),
+        sessionState: document.getElementById("sessionState"),
+        detailState: document.getElementById("detailState"),
+        phase: document.getElementById("phase"),
+        capture: document.getElementById("capture"),
+        side: document.getElementById("side"),
+        topicView: document.getElementById("topicView"),
+        split: document.getElementById("split"),
+        scoreA: document.getElementById("scoreA"),
+        scoreB: document.getElementById("scoreB"),
+      };
+
+      function setStatus(message, isError = false) {
+        els.status.textContent = message;
+        els.status.style.background = isError ? "#fde7e1" : "#fff4df";
+        els.status.style.borderColor = isError ? "#e4b3a5" : "#ecd6ae";
+        els.status.style.color = isError ? "#8a2e20" : "#80592c";
+      }
+
+      function pretty(data) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      function requireSession() {
+        const sessionId = els.sessionId.value.trim();
+        if (!sessionId) {
+          throw new Error("Create a debate first or paste a session ID.");
+        }
+        state.sessionId = sessionId;
+        return sessionId;
+      }
+
+      function updateLiveScore(liveScore) {
+        if (!liveScore) return;
+        const a = liveScore.side_a_percent ?? 50;
+        const b = liveScore.side_b_percent ?? 50;
+        els.split.style.setProperty("--a", `${a}%`);
+        els.scoreA.textContent = `A ${a}%`;
+        els.scoreB.textContent = `B ${b}%`;
+      }
+
+      function updateSessionView(data) {
+        if (!data) return;
+        state.session = data;
+        if (data.id) {
+          state.sessionId = data.id;
+          els.sessionId.value = data.id;
+        }
+        els.phase.textContent = data.current_phase ?? "-";
+        els.capture.textContent = data.capture_status ?? "-";
+        els.side.textContent = data.active_side ?? "-";
+        els.topicView.textContent = data.topic ?? "-";
+        updateLiveScore(data.live_score);
+        els.sessionState.textContent = pretty(data);
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          headers: { "Content-Type": "application/json" },
+          ...options,
+        });
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : {};
+        if (!response.ok) {
+          throw new Error(data.detail || `Request failed with ${response.status}`);
+        }
+        return data;
+      }
+
+      async function refreshState() {
+        const sessionId = requireSession();
+        const data = await api(`/debates/${sessionId}`);
+        updateSessionView(data);
+        setStatus(`Loaded session ${sessionId}.`);
+      }
+
+      document.getElementById("createBtn").addEventListener("click", async () => {
+        try {
+          const data = await api("/debates", {
+            method: "POST",
+            body: JSON.stringify({
+              topic: els.topic.value,
+              participant_a_id: els.participantA.value,
+              participant_b_id: els.participantB.value,
+              rules: { min_utterances_per_side: 1 },
+            }),
+          });
+          updateSessionView(data);
+          setStatus(`Debate created: ${data.id}`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      document.getElementById("startBtn").addEventListener("click", async () => {
+        try {
+          const sessionId = requireSession();
+          const data = await api(`/debates/${sessionId}/start`, {
+            method: "POST",
+            body: JSON.stringify({
+              stance_a: els.stanceA.value,
+              stance_b: els.stanceB.value,
+              active_side: els.activeSide.value,
+            }),
+          });
+          els.phase.textContent = data.current_phase;
+          els.capture.textContent = data.capture_status;
+          els.side.textContent = data.active_side;
+          await refreshState();
+          setStatus(`Debate ${sessionId} started.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      document.getElementById("sendUtteranceBtn").addEventListener("click", async () => {
+        try {
+          const sessionId = requireSession();
+          const transcriptText = els.utterance.value.trim();
+          if (!transcriptText) throw new Error("Type an utterance first.");
+          const data = await api(`/debates/${sessionId}/utterance`, {
+            method: "POST",
+            body: JSON.stringify({ transcript_text: transcriptText }),
+          });
+          updateLiveScore(data.live_score);
+          els.detailState.textContent = pretty(data);
+          els.utterance.value = "";
+          await refreshState();
+          setStatus(`Utterance accepted for side ${data.active_side}.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      async function switchSide(nextSide) {
+        const sessionId = requireSession();
+        const data = await api(`/debates/${sessionId}/switch-side`, {
+          method: "POST",
+          body: JSON.stringify({ next_side: nextSide }),
+        });
+        updateSessionView(data);
+        setStatus(`Switched active side to ${nextSide}.`);
+      }
+
+      document.getElementById("switchSidesBtn").addEventListener("click", async () => {
+        try {
+          const currentSide = (state.session?.active_side || els.side.textContent || "A").trim();
+          const nextSide = currentSide === "A" ? "B" : "A";
+          await switchSide(nextSide);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      document.getElementById("endBtn").addEventListener("click", async () => {
+        try {
+          const sessionId = requireSession();
+          const data = await api(`/debates/${sessionId}/end`, { method: "POST" });
+          els.detailState.textContent = pretty(data);
+          await refreshState();
+          setStatus(`Debate ended. Post-debate processing completed.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      document.getElementById("refreshBtn").addEventListener("click", async () => {
+        try { await refreshState(); } catch (error) { setStatus(error.message, true); }
+      });
+
+      document.getElementById("transcriptBtn").addEventListener("click", async () => {
+        try {
+          const sessionId = requireSession();
+          const data = await api(`/debates/${sessionId}/transcript`);
+          els.detailState.textContent = pretty(data);
+          setStatus(`Transcript loaded for ${sessionId}.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      document.getElementById("verdictBtn").addEventListener("click", async () => {
+        try {
+          const sessionId = requireSession();
+          const data = await api(`/debates/${sessionId}/verdict`, { method: "POST" });
+          els.detailState.textContent = pretty(data);
+          setStatus(`Verdict loaded for ${sessionId}.`);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+    </script>
+  </body>
+</html>

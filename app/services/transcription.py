@@ -46,7 +46,10 @@ class GeminiTranscriptionProvider(TranscriptionProvider):
             )
 
         if payload.audio_base64:
-            transcript = self._transcribe_audio_inline(payload.audio_base64)
+            transcript = self._transcribe_audio_inline(
+                payload.audio_base64,
+                payload.audio_mime_type or "audio/webm",
+            )
             return TranscriptionResult(
                 transcript_text=transcript,
                 source="gemini_audio_base64",
@@ -61,7 +64,7 @@ class GeminiTranscriptionProvider(TranscriptionProvider):
 
         raise InvalidDebateAction("Unable to transcribe utterance payload.")
 
-    def _transcribe_audio_inline(self, audio_base64: str) -> str:
+    def _transcribe_audio_inline(self, audio_base64: str, audio_mime_type: str) -> str:
         url = "{base}/v1beta/models/{model}:generateContent?key={key}".format(
             base=self.api_base.rstrip("/"),
             model=self.model,
@@ -79,7 +82,7 @@ class GeminiTranscriptionProvider(TranscriptionProvider):
                         },
                         {
                             "inline_data": {
-                                "mime_type": "audio/webm",
+                                "mime_type": audio_mime_type,
                                 "data": audio_base64,
                             }
                         },
@@ -89,7 +92,11 @@ class GeminiTranscriptionProvider(TranscriptionProvider):
         }
         with httpx.Client(timeout=30.0) as client:
             response = client.post(url, json=body)
-            response.raise_for_status()
+            if response.is_error:
+                raise InvalidDebateAction(
+                    "Gemini transcription failed with status "
+                    f"{response.status_code}: {response.text}"
+                )
             data = response.json()
         candidates = data.get("candidates", [])
         if not candidates:

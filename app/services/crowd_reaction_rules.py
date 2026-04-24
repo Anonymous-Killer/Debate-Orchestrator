@@ -101,21 +101,41 @@ PROTECTED_GROUP_TERMS = {
     "white",
     "asian",
     "latino",
+    "arab",
+    "african",
+    "indian",
+    "mexican",
+    "chinese",
+    "japanese",
     "immigrant",
+    "migrant",
+    "refugee",
     "gay",
     "lesbian",
     "trans",
     "transgender",
     "queer",
+    "bisexual",
+    "nonbinary",
     "woman",
     "women",
     "man",
     "men",
+    "gender",
+    "ethnicity",
+    "ethnic group",
     "disabled",
     "disability",
     "autistic",
     "down syndrome",
     "genetic purity",
+    "poor",
+    "poverty",
+    "low income",
+    "working class",
+    "homeless",
+    "uneducated",
+    "lower class",
 }
 
 SELECTION_VERBS = {
@@ -144,6 +164,22 @@ EXCLUSION_PHRASES = {
     "exclude them",
     "remove them",
     "keep our kind",
+    "no girl child",
+    "no boy child",
+    "no female child",
+    "no male child",
+    "no girls",
+    "no boys",
+    "not welcome",
+    "don't belong",
+    "do not belong",
+    "should be excluded",
+    "should be removed",
+    "should not exist here",
+    "keep them out",
+    "leave them out",
+    "push them out",
+    "not one of us",
 }
 
 DISCRIMINATORY_ACTION_TERMS = {
@@ -161,6 +197,13 @@ DISCRIMINATORY_ACTION_TERMS = {
     "weed out",
     "filter out",
     "get rid of",
+    "deny housing",
+    "deny jobs",
+    "deny service",
+    "block from school",
+    "block from work",
+    "refuse entry",
+    "refuse service",
 }
 
 DEHUMANIZING_TERMS = {
@@ -186,6 +229,49 @@ DISCRIMINATORY_JUSTIFICATION_TERMS = {
     "because of gender",
     "genetic quality",
     "keep society pure",
+    "make sure no",
+    "ensure no",
+    "because they are poor",
+    "because they are women",
+    "because they are men",
+    "because they are muslim",
+    "because they are christian",
+    "because they are jewish",
+    "because they are immigrants",
+    "because of ethnicity",
+    "because of class",
+    "because of income",
+}
+
+EXISTENCE_DENIAL_PATTERNS = {
+    "no {group} is born",
+    "no {group} are born",
+    "no {group} should be born",
+    "{group} should not be born",
+    "prevent {group} from being born",
+    "make sure no {group} is born",
+    "ensure no {group} is born",
+    "so that no {group} is born",
+}
+
+GENERAL_EXCLUSION_PATTERNS = {
+    "no {group}",
+    "not {group}",
+    "without {group}",
+    "exclude {group}",
+    "ban {group}",
+    "remove {group}",
+    "deport {group}",
+    "segregate {group}",
+    "keep out {group}",
+    "filter out {group}",
+    "screen out {group}",
+    "get rid of {group}",
+    "no place for {group}",
+    "{group} are not welcome",
+    "{group} do not belong",
+    "{group} should be excluded",
+    "{group} should be removed",
 }
 
 POSITIVE_STANCE_TERMS = {
@@ -276,6 +362,18 @@ def analyze_crowd_signal(text: str) -> CrowdSignal:
     discriminatory_justification_hits = sum(
         1 for phrase in DISCRIMINATORY_JUSTIFICATION_TERMS if phrase in normalized_text
     )
+    existence_denial_hits = sum(
+        1
+        for group in PROTECTED_GROUP_TERMS
+        for pattern in EXISTENCE_DENIAL_PATTERNS
+        if pattern.format(group=group) in normalized_text
+    )
+    general_exclusion_hits = sum(
+        1
+        for group in PROTECTED_GROUP_TERMS
+        for pattern in GENERAL_EXCLUSION_PATTERNS
+        if pattern.format(group=group) in normalized_text
+    )
     amplifier_bonus = sum(1 for phrase in AMPLIFIER_PHRASES if phrase in normalized_text)
     contrast_bonus = 3 if any(token in words for token in {"but", "yet", "however"}) else 0
     emphasis_bonus = 2 if len(words) >= 12 and any(token in words for token in {"must", "cannot", "never"}) else 0
@@ -287,6 +385,8 @@ def analyze_crowd_signal(text: str) -> CrowdSignal:
         or (protected_group_hits >= 1 and discriminatory_action_hits >= 1)
         or (protected_group_hits >= 1 and dehumanizing_hits >= 1)
         or (protected_group_hits >= 1 and discriminatory_justification_hits >= 1)
+        or existence_denial_hits >= 1
+        or general_exclusion_hits >= 1
         or dehumanizing_hits >= 2
     )
 

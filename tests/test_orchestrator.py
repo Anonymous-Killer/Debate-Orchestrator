@@ -223,3 +223,69 @@ def test_live_score_penalizes_professional_sounding_discriminatory_argument():
 
     assert response.live_score.side_a_percent < 50
     assert "crowd backlash" in response.live_score.reasoning_summary
+
+
+def test_live_score_penalizes_existence_denial_discriminatory_argument():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should abortion be legal?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="It should be legal so that we can make sure no girl child is born."
+        ),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert "crowd backlash" in response.live_score.reasoning_summary
+
+
+def test_live_score_penalizes_religious_exclusion_argument():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Immigration policy", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="We should exclude muslim immigrants because of religion and keep them out."
+        ),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert "crowd backlash" in response.live_score.reasoning_summary
+
+
+def test_live_score_penalizes_financial_status_discrimination_argument():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Housing policy", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="Poor families should be excluded from these neighborhoods because of income."
+        ),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert "crowd backlash" in response.live_score.reasoning_summary

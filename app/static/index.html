@@ -103,6 +103,12 @@
       button.secondary { background: #d8c2a7; color: var(--ink); }
       button.good { background: var(--good); }
       button.bad { background: var(--bad); }
+      button.recording { background: var(--bad); }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
       .status {
         margin-bottom: 16px;
         padding: 12px 14px;
@@ -176,6 +182,14 @@
         color: var(--ink);
         font-size: 0.82rem;
       }
+      .voice-note {
+        padding: 12px;
+        border-radius: 14px;
+        background: #fffdf8;
+        border: 1px dashed var(--line);
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
       @media (max-width: 980px) {
         .grid, .console, .meta { grid-template-columns: 1fr; }
       }
@@ -188,7 +202,7 @@
         <h1>Debate Orchestrator</h1>
         <p>
           A very basic browser UI for testing the backend without assembling POST requests by hand.
-          Use text utterances for now, then end the debate to trigger the post-debate pipeline.
+          Start the debate, record each side with one button, and let the button alternate between Side A and Side B automatically.
         </p>
       </section>
 
@@ -244,14 +258,12 @@
 
           <h2>Live Debate</h2>
 
-          <div class="field">
-            <label for="utterance">Utterance text</label>
-            <textarea id="utterance" placeholder="Type the current side's point here..."></textarea>
+          <div class="voice-note" id="voiceNote">
+            Start the debate first. Then use the single point button to record Side A, end the point, and continue with Side B automatically.
           </div>
 
           <div class="button-row">
-            <button id="sendUtteranceBtn">Send Utterance</button>
-            <button id="switchSidesBtn" class="secondary">Switch Sides</button>
+            <button id="pointBtn" class="secondary" disabled>Start the point - A</button>
             <button id="endBtn" class="bad">End Debate</button>
           </div>
 
@@ -297,6 +309,10 @@
       const state = {
         sessionId: "",
         session: null,
+        mediaRecorder: null,
+        mediaStream: null,
+        mediaChunks: [],
+        isRecording: false,
       };
 
       const els = {
@@ -307,7 +323,8 @@
         stanceB: document.getElementById("stanceB"),
         activeSide: document.getElementById("activeSide"),
         sessionId: document.getElementById("sessionId"),
-        utterance: document.getElementById("utterance"),
+        pointBtn: document.getElementById("pointBtn"),
+        voiceNote: document.getElementById("voiceNote"),
         status: document.getElementById("status"),
         sessionState: document.getElementById("sessionState"),
         detailState: document.getElementById("detailState"),
@@ -340,6 +357,10 @@
         return sessionId;
       }
 
+      function activeSide() {
+        return (state.session?.active_side || els.side.textContent || "A").trim();
+      }
+
       function updateLiveScore(liveScore) {
         if (!liveScore) return;
         const a = liveScore.side_a_percent ?? 50;
@@ -347,6 +368,26 @@
         els.split.style.setProperty("--a", `${a}%`);
         els.scoreA.textContent = `A ${a}%`;
         els.scoreB.textContent = `B ${b}%`;
+      }
+
+      function syncPointButton() {
+        const captureStatus = state.session?.capture_status || els.capture.textContent || "idle";
+        const live = captureStatus === "recording";
+        const side = activeSide();
+        els.pointBtn.disabled = !state.sessionId || !live;
+
+        if (state.isRecording) {
+          els.pointBtn.textContent = "End point";
+          els.pointBtn.classList.add("recording");
+          els.voiceNote.textContent = `Recording Side ${side}. Click "End point" to stop and submit the voice argument.`;
+          return;
+        }
+
+        els.pointBtn.classList.remove("recording");
+        els.pointBtn.textContent = `Start the point - ${side}`;
+        els.voiceNote.textContent = live
+          ? `Ready to record Side ${side}. Click the button to start the point.`
+          : "Start the debate first. Then use the single point button to record Side A, end the point, and continue with Side B automatically.";
       }
 
       function updateSessionView(data) {
@@ -362,6 +403,7 @@
         els.topicView.textContent = data.topic ?? "-";
         updateLiveScore(data.live_score);
         els.sessionState.textContent = pretty(data);
+        syncPointButton();
       }
 
       async function api(path, options = {}) {
@@ -382,6 +424,103 @@
         const data = await api(`/debates/${sessionId}`);
         updateSessionView(data);
         setStatus(`Loaded session ${sessionId}.`);
+      }
+
+      async function blobToBase64(blob) {
+        const buffer = await blob.arrayBuffer();
+        let binary = "";
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, i + chunkSize);
+          binary += String.fromCharCode(...chunk);
+        }
+        return btoa(binary);
+      }
+
+      async function startPointRecording() {
+        if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+          throw new Error("This browser does not support microphone recording.");
+        }
+
+        const preferredTypes = [
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/mp4",
+          "audio/ogg;codecs=opus",
+        ];
+        const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
+        state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.mediaChunks = [];
+        state.mediaRecorder = mimeType
+          ? new MediaRecorder(state.mediaStream, { mimeType })
+          : new MediaRecorder(state.mediaStream);
+        state.mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            state.mediaChunks.push(event.data);
+          }
+        };
+        state.mediaRecorder.start();
+        state.isRecording = true;
+        syncPointButton();
+        setStatus(`Recording point for Side ${activeSide()}...`);
+      }
+
+      async function stopPointRecording() {
+        if (!state.mediaRecorder) return;
+
+        const sessionId = requireSession();
+        const currentSide = activeSide();
+        const mediaRecorder = state.mediaRecorder;
+        const mediaStream = state.mediaStream;
+
+        const onStop = new Promise((resolve, reject) => {
+          mediaRecorder.onstop = async () => {
+            try {
+              const blob = new Blob(state.mediaChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+              const audioBase64 = await blobToBase64(blob);
+              const utterance = await api(`/debates/${sessionId}/utterance`, {
+                method: "POST",
+                body: JSON.stringify({
+                  audio_base64: audioBase64,
+                  audio_mime_type: blob.type || "audio/webm",
+                }),
+              });
+              updateLiveScore(utterance.live_score);
+              els.detailState.textContent = pretty(utterance);
+              await refreshState();
+
+              const nextSide = currentSide === "A" ? "B" : "A";
+              try {
+                const switched = await api(`/debates/${sessionId}/switch-side`, {
+                  method: "POST",
+                  body: JSON.stringify({ next_side: nextSide }),
+                });
+                updateSessionView(switched);
+              } catch (error) {
+                const message = String(error.message || "");
+                if (!message.includes("already active")) {
+                  throw error;
+                }
+              }
+
+              setStatus(`Recorded and submitted the point for Side ${currentSide}.`);
+              resolve();
+            } catch (error) {
+              reject(error);
+            } finally {
+              mediaStream?.getTracks().forEach((track) => track.stop());
+              state.mediaRecorder = null;
+              state.mediaStream = null;
+              state.mediaChunks = [];
+              state.isRecording = false;
+              syncPointButton();
+            }
+          };
+        });
+
+        mediaRecorder.stop();
+        return onStop;
       }
 
       document.getElementById("createBtn").addEventListener("click", async () => {
@@ -423,41 +562,20 @@
         }
       });
 
-      document.getElementById("sendUtteranceBtn").addEventListener("click", async () => {
+      els.pointBtn.addEventListener("click", async () => {
         try {
-          const sessionId = requireSession();
-          const transcriptText = els.utterance.value.trim();
-          if (!transcriptText) throw new Error("Type an utterance first.");
-          const data = await api(`/debates/${sessionId}/utterance`, {
-            method: "POST",
-            body: JSON.stringify({ transcript_text: transcriptText }),
-          });
-          updateLiveScore(data.live_score);
-          els.detailState.textContent = pretty(data);
-          els.utterance.value = "";
-          await refreshState();
-          setStatus(`Utterance accepted for side ${data.active_side}.`);
+          if (state.isRecording) {
+            await stopPointRecording();
+          } else {
+            await startPointRecording();
+          }
         } catch (error) {
-          setStatus(error.message, true);
-        }
-      });
-
-      async function switchSide(nextSide) {
-        const sessionId = requireSession();
-        const data = await api(`/debates/${sessionId}/switch-side`, {
-          method: "POST",
-          body: JSON.stringify({ next_side: nextSide }),
-        });
-        updateSessionView(data);
-        setStatus(`Switched active side to ${nextSide}.`);
-      }
-
-      document.getElementById("switchSidesBtn").addEventListener("click", async () => {
-        try {
-          const currentSide = (state.session?.active_side || els.side.textContent || "A").trim();
-          const nextSide = currentSide === "A" ? "B" : "A";
-          await switchSide(nextSide);
-        } catch (error) {
+          state.mediaRecorder = null;
+          state.mediaStream?.getTracks().forEach((track) => track.stop());
+          state.mediaStream = null;
+          state.mediaChunks = [];
+          state.isRecording = false;
+          syncPointButton();
           setStatus(error.message, true);
         }
       });
@@ -475,7 +593,11 @@
       });
 
       document.getElementById("refreshBtn").addEventListener("click", async () => {
-        try { await refreshState(); } catch (error) { setStatus(error.message, true); }
+        try {
+          await refreshState();
+        } catch (error) {
+          setStatus(error.message, true);
+        }
       });
 
       document.getElementById("transcriptBtn").addEventListener("click", async () => {
@@ -499,6 +621,8 @@
           setStatus(error.message, true);
         }
       });
+
+      syncPointButton();
     </script>
   </body>
 </html>

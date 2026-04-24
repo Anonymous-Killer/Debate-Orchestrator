@@ -14,7 +14,14 @@ STATIC_INDEX = Path(__file__).resolve().parent / "static" / "index.html"
 
 @app.get("/", include_in_schema=False)
 def local_ui() -> FileResponse:
-    return FileResponse(STATIC_INDEX)
+    return FileResponse(
+        STATIC_INDEX,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.on_event("startup")

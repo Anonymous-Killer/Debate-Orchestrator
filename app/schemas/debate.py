@@ -31,6 +31,7 @@ class UtteranceCreate(BaseModel):
     transcript_text: Optional[str] = None
     audio_ref: Optional[str] = None
     audio_base64: Optional[str] = None
+    audio_mime_type: Optional[str] = None
     idempotency_key: Optional[str] = None
 
     @model_validator(mode="after")

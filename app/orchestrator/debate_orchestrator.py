@@ -201,6 +201,9 @@ class DebateOrchestrator:
             live_score=session.current_live_score,
         )
 
+    def list_debates(self) -> list[DebateSummaryResponse]:
+        return [self._summary(s) for s in self.repository.list_sessions()]
+
     def get_debate(self, session_id: str) -> DebateSummaryResponse:
         return self._summary(self.repository.get_session(session_id))
 

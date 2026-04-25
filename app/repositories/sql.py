@@ -59,6 +59,11 @@ class SQLDebateRepository:
             db.commit()
         return session
 
+    def list_sessions(self) -> List[DebateSession]:
+        with self.session_factory() as db:
+            rows = db.exec(select(DebateSessionEntity)).all()
+            return [self._session_from_entity(row) for row in rows]
+
     def add_turn(self, turn: TurnRecord, idempotency_key: Optional[str] = None) -> TurnRecord:
         del idempotency_key
         with self.session_factory() as db:

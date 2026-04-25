@@ -42,6 +42,9 @@ class InMemoryDebateRepository:
         self.sessions[session.id] = session
         return session
 
+    def list_sessions(self) -> list[DebateSession]:
+        return list(self.sessions.values())
+
     def add_turn(self, turn: TurnRecord, idempotency_key: Optional[str] = None) -> TurnRecord:
         if idempotency_key and idempotency_key in self.idempotency[turn.session_id]:
             return self.idempotency[turn.session_id][idempotency_key]

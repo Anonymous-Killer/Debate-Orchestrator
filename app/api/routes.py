@@ -27,6 +27,13 @@ def _map_error(error: DebateError) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
 
 
+@router.get("/debates", response_model=list[DebateSummaryResponse])
+def list_debates(
+    orchestrator: DebateOrchestrator = Depends(get_orchestrator),
+) -> list[DebateSummaryResponse]:
+    return orchestrator.list_debates()
+
+
 @router.post("/debates", response_model=DebateSummaryResponse, status_code=status.HTTP_201_CREATED)
 def create_debate(
     request: CreateDebateRequest,

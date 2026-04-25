@@ -289,3 +289,29 @@ def test_live_score_penalizes_financial_status_discrimination_argument():
 
     assert response.live_score.side_a_percent < 50
     assert "crowd backlash" in response.live_score.reasoning_summary
+
+
+def test_live_score_treats_unpredictable_not_beneficial_replacement_argument_as_no_aligned():
+    orchestrator = build_orchestrator()
+    created = orchestrator.create_debate(
+        CreateDebateRequest(
+            topic="Should wars be replaced by 1vs1 duels?",
+            participant_a_id="a",
+            participant_b_id="b",
+        )
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.B),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="Replacing war will mean a new system which is not predictable and not beneficial for us."
+        ),
+    )
+
+    assert response.live_score.side_b_percent > 50
+    assert "stated stance" not in response.live_score.reasoning_summary

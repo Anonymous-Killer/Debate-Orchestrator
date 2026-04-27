@@ -2,6 +2,7 @@
   "tests/test_api.py::test_full_voice_debate_flow",
   "tests/test_api.py::test_rejects_utterance_after_end",
   "tests/test_orchestrator.py::test_audio_payload_uses_transcription_provider",
+  "tests/test_orchestrator.py::test_financial_readiness_abortion_argument_is_not_locally_overridden_as_discriminatory",
   "tests/test_orchestrator.py::test_full_voice_debate_flow",
   "tests/test_orchestrator.py::test_live_score_allows_large_but_capped_swings_for_emotional_points",
   "tests/test_orchestrator.py::test_live_score_penalizes_ethically_toxic_argument_even_if_stance_aligned",
@@ -11,7 +12,13 @@
   "tests/test_orchestrator.py::test_live_score_penalizes_professional_sounding_discriminatory_argument",
   "tests/test_orchestrator.py::test_live_score_penalizes_religious_exclusion_argument",
   "tests/test_orchestrator.py::test_live_score_treats_unpredictable_not_beneficial_replacement_argument_as_no_aligned",
+  "tests/test_orchestrator.py::test_nim_failure_is_visible_in_live_score_reasoning",
+  "tests/test_orchestrator.py::test_nim_scoring_accepts_fractional_percentages_before_gating",
+  "tests/test_orchestrator.py::test_nim_scoring_gates_filler_argument_even_if_model_returns_score_increase",
+  "tests/test_orchestrator.py::test_nim_scoring_is_overridden_for_ethically_toxic_point",
+  "tests/test_orchestrator.py::test_nim_scoring_is_overridden_for_socially_frowned_devaluation_point",
   "tests/test_orchestrator.py::test_rejects_utterance_after_end",
+  "tests/test_reasoning.py::test_reasoning_json_dump_serializes_datetime_values",
   "tests/test_state_machine.py::test_state_machine_allows_live_capture_flow",
   "tests/test_state_machine.py::test_state_machine_rejects_invalid_transition"
 ]

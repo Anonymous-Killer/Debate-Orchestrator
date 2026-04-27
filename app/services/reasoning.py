@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 
 import httpx
+from pydantic import BaseModel
 
 from app.core.config import settings
 
@@ -19,9 +21,9 @@ class NvidiaNIMReasoningProvider(ReasoningProvider):
         model: Optional[str] = None,
         api_base: Optional[str] = None,
     ) -> None:
-        self.api_key = api_key or settings.nim_api_key
-        self.model = model or settings.nim_model
-        self.api_base = api_base or settings.nim_api_base
+        self.api_key = settings.nim_api_key if api_key is None else api_key
+        self.model = settings.nim_model if model is None else model
+        self.api_base = settings.nim_api_base if api_base is None else api_base
 
     @property
     def available(self) -> bool:
@@ -51,18 +53,28 @@ class NvidiaNIMReasoningProvider(ReasoningProvider):
             "Authorization": "Bearer {key}".format(key=self.api_key),
             "Content-Type": "application/json",
         }
-        with httpx.Client(timeout=45.0) as client:
+        with httpx.Client(timeout=settings.nim_timeout_seconds) as client:
             response = client.post(url, json=body, headers=headers)
-            response.raise_for_status()
+            if response.is_error:
+                raise RuntimeError(
+                    "NVIDIA NIM request failed with status "
+                    f"{response.status_code}: {response.text}"
+                )
             data = response.json()
         content = data["choices"][0]["message"]["content"]
         return httpx.Response(200, content=content).json()
 
     @staticmethod
     def _json_dump(payload: Dict[str, Any]) -> str:
-        import json
+        return json.dumps(payload, ensure_ascii=True, default=_json_default)
 
-        return json.dumps(payload, ensure_ascii=True)
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 class FallbackReasoningProvider(ReasoningProvider):

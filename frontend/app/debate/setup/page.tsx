@@ -6,9 +6,11 @@ import { api } from '@/lib/api'
 
 export default function SetupPage() {
   const router = useRouter()
-  const [form, setForm] = useState({ topic: '', sideA: '', sideB: '', stanceA: 'For', stanceB: 'Against' })
+  const [form, setForm] = useState({ topic: '', sideA: '', sideB: '', stanceA: 'For' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const stanceB = form.stanceA === 'For' ? 'Against' : 'For'
 
   function set(k: keyof typeof form, v: string) {
     setForm(f => ({ ...f, [k]: v }))
@@ -26,8 +28,8 @@ export default function SetupPage() {
         participant_b_id: form.sideB.trim(),
       })
       await api.startDebate(debate.id, {
-        stance_a: form.stanceA.trim() || 'For',
-        stance_b: form.stanceB.trim() || 'Against',
+        stance_a: form.stanceA,
+        stance_b: stanceB,
         active_side: 'A',
       })
       const params = new URLSearchParams({
@@ -135,35 +137,38 @@ export default function SetupPage() {
           <div className="h-px bg-white/[0.07]" />
 
           {/* Stances */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label
-                className="text-xs font-semibold tracking-widest uppercase"
-                style={{ color: '#e87848' }}
-              >
-                Side A — Stance
-              </label>
-              <input
-                className={inputCls}
-                value={form.stanceA}
-                onChange={e => set('stanceA', e.target.value)}
-                placeholder="For"
-              />
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-muted tracking-widest uppercase">
+              Stances
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Side A dropdown */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold" style={{ color: '#e87848' }}>Side A</span>
+                <select
+                  value={form.stanceA}
+                  onChange={e => set('stanceA', e.target.value)}
+                  className="w-full bg-white/[0.04] border border-white/[0.07] focus:border-cta focus:ring-2 focus:ring-cta/20 rounded-xl px-4 py-3 text-ink outline-none transition-all font-sans text-sm appearance-none cursor-pointer"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237070a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' }}
+                >
+                  <option value="For" style={{ background: '#161628' }}>For</option>
+                  <option value="Against" style={{ background: '#161628' }}>Against</option>
+                </select>
+              </div>
+
+              {/* Side B — auto-set, read only */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold" style={{ color: '#48a8e0' }}>Side B</span>
+                <div
+                  className="w-full bg-white/[0.02] border border-white/[0.04] rounded-xl px-4 py-3 text-muted font-sans text-sm select-none"
+                  title="Automatically set to the opposite of Side A"
+                >
+                  {stanceB}
+                  <span className="ml-2 text-xs text-dim">(auto)</span>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <label
-                className="text-xs font-semibold tracking-widest uppercase"
-                style={{ color: '#48a8e0' }}
-              >
-                Side B — Stance
-              </label>
-              <input
-                className={inputCls}
-                value={form.stanceB}
-                onChange={e => set('stanceB', e.target.value)}
-                placeholder="Against"
-              />
-            </div>
+            <p className="text-xs text-dim">Side B is automatically set to the opposite stance.</p>
           </div>
         </motion.div>
 
@@ -201,7 +206,7 @@ export default function SetupPage() {
             {loading ? 'Starting…' : 'Start Debate →'}
           </motion.button>
           <p className="text-center text-xs text-muted mt-3">
-            Side A argues with their stance · Side B argues with theirs
+            Side A: <span className="text-side-a">{form.stanceA}</span> · Side B: <span className="text-side-b">{stanceB}</span>
           </p>
         </motion.div>
       </div>

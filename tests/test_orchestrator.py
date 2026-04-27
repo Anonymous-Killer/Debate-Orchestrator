@@ -14,6 +14,21 @@ from app.services.reasoning import NvidiaNIMReasoningProvider
 from app.services.transcription import GeminiTranscriptionProvider, TranscriptionResult
 
 
+class FakeNIMReasoningProvider:
+    available = True
+
+    def __init__(self, response=None, error=None):
+        self.response = response or {}
+        self.error = error
+        self.last_prompt = ""
+
+    def complete_json(self, system_prompt, user_payload):
+        self.last_prompt = system_prompt
+        if self.error:
+            raise self.error
+        return self.response
+
+
 class FakeGeminiTranscriptionProvider(GeminiTranscriptionProvider):
     def transcribe(self, payload: UtteranceCreate) -> TranscriptionResult:
         if payload.transcript_text:
@@ -31,6 +46,10 @@ class FakeGeminiTranscriptionProvider(GeminiTranscriptionProvider):
 
 def build_orchestrator() -> DebateOrchestrator:
     reasoning_provider = NvidiaNIMReasoningProvider(api_key="")
+    return build_orchestrator_with_reasoning(reasoning_provider)
+
+
+def build_orchestrator_with_reasoning(reasoning_provider) -> DebateOrchestrator:
     return DebateOrchestrator(
         repository=InMemoryDebateRepository(),
         state_machine=DebateStateMachine(),
@@ -315,3 +334,221 @@ def test_live_score_treats_unpredictable_not_beneficial_replacement_argument_as_
 
     assert response.live_score.side_b_percent > 50
     assert "stated stance" not in response.live_score.reasoning_summary
+
+
+def test_nim_scoring_gates_filler_argument_even_if_model_returns_score_increase():
+    reasoning_provider = FakeNIMReasoningProvider(
+        response={
+            "side_a_percent": 60,
+            "side_b_percent": 40,
+            "delta_a": 10,
+            "delta_b": -10,
+            "trend": "A_up",
+            "confidence": 0.8,
+            "reasoning_summary": "Bad model response that incorrectly rewards filler.",
+            "topic_relevance": 0.05,
+            "argument_quality": 0.05,
+            "score_change_allowed": False,
+            "scoring_source": "nim",
+        }
+    )
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should school uniforms be mandatory?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(transcript_text="Hello, hello, hello, hello."),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert response.live_score.score_change_allowed is False
+    assert response.live_score.scoring_source == "nim_gated"
+    assert "not sufficiently relevant" in response.live_score.reasoning_summary
+    assert "topic_relevance" in reasoning_provider.last_prompt
+    assert "argument_quality" in reasoning_provider.last_prompt
+    assert "score_change_allowed" in reasoning_provider.last_prompt
+
+
+def test_nim_scoring_accepts_fractional_percentages_before_gating():
+    reasoning_provider = FakeNIMReasoningProvider(
+        response={
+            "side_a_percent": 49.5,
+            "side_b_percent": 50.5,
+            "delta_a": -0.5,
+            "delta_b": 0.5,
+            "trend": "B_up",
+            "confidence": 0.7,
+            "reasoning_summary": "Filler should not move the score up.",
+            "topic_relevance": 0.05,
+            "argument_quality": 0.05,
+            "score_change_allowed": False,
+            "scoring_source": "nim",
+        }
+    )
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should school uniforms be mandatory?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(transcript_text="Hello, hello, hello, hello."),
+    )
+
+    assert response.live_score.side_a_percent == 48
+    assert response.live_score.side_b_percent == 52
+    assert response.live_score.scoring_source == "nim_gated"
+
+
+def test_nim_scoring_is_overridden_for_ethically_toxic_point():
+    reasoning_provider = FakeNIMReasoningProvider(
+        response={
+            "side_a_percent": 60,
+            "side_b_percent": 40,
+            "delta_a": 10,
+            "delta_b": -10,
+            "trend": "A_up",
+            "confidence": 0.7,
+            "reasoning_summary": "Incorrectly rewarding an unethical point.",
+            "topic_relevance": 0.9,
+            "argument_quality": 0.8,
+            "score_change_allowed": True,
+            "scoring_source": "nim",
+        }
+    )
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should abortion be legal?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(transcript_text="Abortion should be made legal so that we can avoid having the birth of any girl."),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert response.live_score.score_change_allowed is False
+    assert response.live_score.scoring_source == "nim_overridden_crowd_backlash"
+    assert "overridden" in response.live_score.reasoning_summary
+
+
+def test_financial_readiness_abortion_argument_is_not_locally_overridden_as_discriminatory():
+    reasoning_provider = FakeNIMReasoningProvider(
+        response={
+            "side_a_percent": 56,
+            "side_b_percent": 44,
+            "delta_a": 6,
+            "delta_b": -6,
+            "trend": "A_up",
+            "confidence": 0.75,
+            "reasoning_summary": "The point is relevant and supports the stated stance.",
+            "topic_relevance": 0.9,
+            "argument_quality": 0.7,
+            "score_change_allowed": True,
+            "scoring_source": "nim",
+        }
+    )
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should abortion be legal?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text=(
+                "Yes abortion should be legal as some parents are not financially ready "
+                "or mentally ready to have a child."
+            )
+        ),
+    )
+
+    assert response.live_score.scoring_source == "nim"
+    assert response.live_score.side_a_percent == 56
+
+
+def test_nim_scoring_is_overridden_for_socially_frowned_devaluation_point():
+    reasoning_provider = FakeNIMReasoningProvider(
+        response={
+            "side_a_percent": 60,
+            "side_b_percent": 40,
+            "delta_a": 10,
+            "delta_b": -10,
+            "trend": "A_up",
+            "confidence": 0.7,
+            "reasoning_summary": "Incorrectly rewarding a socially toxic point.",
+            "topic_relevance": 0.9,
+            "argument_quality": 0.8,
+            "score_change_allowed": True,
+            "scoring_source": "nim",
+        }
+    )
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should abortion be legal?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text=(
+                "Yes, abortion should be legal as some children are just unwanted and if we somehow "
+                "get a girl who's about to be born, that's something we want to avoid."
+            )
+        ),
+    )
+
+    assert response.live_score.side_a_percent < 50
+    assert response.live_score.scoring_source == "nim_overridden_crowd_backlash"
+
+
+def test_nim_failure_is_visible_in_live_score_reasoning():
+    reasoning_provider = FakeNIMReasoningProvider(error=RuntimeError("NIM exploded"))
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should school uniforms be mandatory?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(transcript_text="Uniforms help students focus because they reduce distractions."),
+    )
+
+    assert response.live_score.side_a_percent == 50
+    assert response.live_score.side_b_percent == 50
+    assert response.live_score.delta_a == 0
+    assert response.live_score.scoring_source == "nim_failed_preserved"
+    assert "NIM live scoring failed after retries" in response.live_score.reasoning_summary
+    assert "NIM exploded" in response.live_score.reasoning_summary

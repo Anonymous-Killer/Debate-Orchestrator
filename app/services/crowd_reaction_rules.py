@@ -219,6 +219,50 @@ DEHUMANIZING_TERMS = {
     "should not exist",
 }
 
+VULNERABLE_PERSON_TERMS = {
+    "child",
+    "children",
+    "baby",
+    "babies",
+    "girl",
+    "boy",
+    "female",
+    "male",
+    "disabled child",
+    "disabled baby",
+}
+
+DEVALUATION_TERMS = {
+    "unwanted",
+    "undesired",
+    "not wanted",
+    "burden",
+    "problem",
+    "mistake",
+    "liability",
+    "less valuable",
+    "not worth",
+}
+
+AVOIDANCE_TERMS = {
+    "want to avoid",
+    "we want to avoid",
+    "avoid having",
+    "avoid the birth",
+    "avoid being born",
+    "should avoid",
+    "prevent from being born",
+    "stop from being born",
+}
+
+BIRTH_CONTEXT_TERMS = {
+    "born",
+    "birth",
+    "about to be born",
+    "being born",
+    "come into the world",
+}
+
 DISCRIMINATORY_JUSTIFICATION_TERMS = {
     "because they are",
     "for being",
@@ -248,6 +292,10 @@ EXISTENCE_DENIAL_PATTERNS = {
     "no {group} are born",
     "no {group} should be born",
     "{group} should not be born",
+    "avoid having the birth of any {group}",
+    "avoid the birth of any {group}",
+    "avoid having any {group}",
+    "avoid any {group} being born",
     "prevent {group} from being born",
     "make sure no {group} is born",
     "ensure no {group} is born",
@@ -380,6 +428,10 @@ def analyze_crowd_signal(text: str) -> CrowdSignal:
     discriminatory_justification_hits = sum(
         1 for phrase in DISCRIMINATORY_JUSTIFICATION_TERMS if phrase in normalized_text
     )
+    vulnerable_person_hits = sum(1 for phrase in VULNERABLE_PERSON_TERMS if phrase in normalized_text)
+    devaluation_hits = sum(1 for phrase in DEVALUATION_TERMS if phrase in normalized_text)
+    avoidance_hits = sum(1 for phrase in AVOIDANCE_TERMS if phrase in normalized_text)
+    birth_context_hits = sum(1 for phrase in BIRTH_CONTEXT_TERMS if phrase in normalized_text)
     existence_denial_hits = sum(
         1
         for group in PROTECTED_GROUP_TERMS
@@ -398,13 +450,14 @@ def analyze_crowd_signal(text: str) -> CrowdSignal:
 
     crowd_backlash = (
         toxic_hits > 0
-        or (protected_group_hits >= 1 and selection_hits >= 1)
         or (protected_group_hits >= 1 and exclusion_hits >= 1)
         or (protected_group_hits >= 1 and discriminatory_action_hits >= 1)
         or (protected_group_hits >= 1 and dehumanizing_hits >= 1)
         or (protected_group_hits >= 1 and discriminatory_justification_hits >= 1)
         or existence_denial_hits >= 1
         or general_exclusion_hits >= 1
+        or (vulnerable_person_hits >= 1 and devaluation_hits >= 1 and avoidance_hits >= 1)
+        or (protected_group_hits >= 1 and avoidance_hits >= 1 and birth_context_hits >= 1)
         or dehumanizing_hits >= 2
     )
 

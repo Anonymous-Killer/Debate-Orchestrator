@@ -14,6 +14,8 @@ class Settings(BaseModel):
     live_score_max_delta: int = 18
     live_score_floor: int = 10
     live_score_ceiling: int = 90
+    nim_live_score_retries: int = int(os.getenv("NIM_LIVE_SCORE_RETRIES", "2"))
+    nim_timeout_seconds: float = float(os.getenv("NIM_TIMEOUT_SECONDS", "20"))
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./debate_orchestrator.db")
     database_echo: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")

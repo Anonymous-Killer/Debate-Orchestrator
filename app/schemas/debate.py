@@ -63,6 +63,10 @@ class LiveScore(BaseModel):
     trend: str = "steady"
     confidence: float = 0.5
     reasoning_summary: str = "Debate momentum is balanced."
+    topic_relevance: float = 0.5
+    argument_quality: float = 0.5
+    score_change_allowed: bool = True
+    scoring_source: str = "fallback"
     is_provisional: bool = True
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

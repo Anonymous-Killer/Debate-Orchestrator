@@ -184,6 +184,7 @@ class DebateOrchestrator:
         verdict = self.verdict_composer.run(
             VerdictComposerInput(session_id=session_id, scorecard=scorecard)
         ).verdict
+        verdict.final_live_score = session.current_live_score
         self.repository.save_verdict(verdict)
         self._transition(session, DebatePhase.AUDIT, {"action": "verdict_completed"})
 
@@ -221,6 +222,7 @@ class DebateOrchestrator:
             if session.current_phase == DebatePhase.LIVE_CAPTURE:
                 raise InvalidDebateAction("Verdict is not available until the debate is ended.")
             raise InvalidDebateAction("Verdict is not available for this debate yet.")
+        verdict.final_live_score = session.current_live_score
         return verdict
 
     def _transition(self, session: DebateSession, target: DebatePhase, payload: dict) -> None:

@@ -94,14 +94,28 @@ def test_full_voice_debate_flow():
         UtteranceCreate(transcript_text="Regulation can chill speech, and the data does not justify broad intervention."),
     )
     assert second.live_score.side_a_percent + second.live_score.side_b_percent == 100
+    final_score_before_end = second.live_score
 
     ended = orchestrator.end_debate(session_id)
     assert ended.verdict_available is True
     assert ended.current_phase == DebatePhase.AUDIT
+    assert ended.live_score.side_a_percent == final_score_before_end.side_a_percent
+    assert ended.live_score.side_b_percent == final_score_before_end.side_b_percent
+
+    summary = orchestrator.get_debate(session_id)
+    assert summary.live_score.side_a_percent == final_score_before_end.side_a_percent
+    assert summary.live_score.side_b_percent == final_score_before_end.side_b_percent
+
+    live_score = orchestrator.get_live_score(session_id)
+    assert live_score.side_a_percent == final_score_before_end.side_a_percent
+    assert live_score.side_b_percent == final_score_before_end.side_b_percent
 
     verdict = orchestrator.get_verdict(session_id)
     assert verdict is not None
     assert verdict.winner in {DebateSide.A, DebateSide.B}
+    assert verdict.final_live_score is not None
+    assert verdict.final_live_score.side_a_percent == final_score_before_end.side_a_percent
+    assert verdict.final_live_score.side_b_percent == final_score_before_end.side_b_percent
 
 
 def test_rejects_utterance_after_end():
@@ -424,6 +438,8 @@ def test_nim_scoring_is_overridden_for_ethically_toxic_point():
             "reasoning_summary": "Incorrectly rewarding an unethical point.",
             "topic_relevance": 0.9,
             "argument_quality": 0.8,
+            "crowd_backlash": True,
+            "crowd_backlash_reason": "The point frames the birth of girls as something to avoid.",
             "score_change_allowed": True,
             "scoring_source": "nim",
         }
@@ -445,8 +461,8 @@ def test_nim_scoring_is_overridden_for_ethically_toxic_point():
 
     assert response.live_score.side_a_percent < 50
     assert response.live_score.score_change_allowed is False
-    assert response.live_score.scoring_source == "nim_overridden_crowd_backlash"
-    assert "overridden" in response.live_score.reasoning_summary
+    assert response.live_score.scoring_source == "nim_crowd_backlash"
+    assert "girls" in response.live_score.reasoning_summary
 
 
 def test_financial_readiness_abortion_argument_is_not_locally_overridden_as_discriminatory():
@@ -501,6 +517,8 @@ def test_nim_scoring_is_overridden_for_socially_frowned_devaluation_point():
             "reasoning_summary": "Incorrectly rewarding a socially toxic point.",
             "topic_relevance": 0.9,
             "argument_quality": 0.8,
+            "crowd_backlash": True,
+            "crowd_backlash_reason": "The point devalues a vulnerable person and treats existence as something to avoid.",
             "score_change_allowed": True,
             "scoring_source": "nim",
         }
@@ -526,7 +544,47 @@ def test_nim_scoring_is_overridden_for_socially_frowned_devaluation_point():
     )
 
     assert response.live_score.side_a_percent < 50
-    assert response.live_score.scoring_source == "nim_overridden_crowd_backlash"
+    assert response.live_score.scoring_source == "nim_crowd_backlash"
+
+
+def test_nim_does_not_treat_ai_replacing_human_judges_as_discrimination():
+    reasoning_provider = FakeNIMReasoningProvider(
+        response={
+            "side_a_percent": 56,
+            "side_b_percent": 44,
+            "delta_a": 6,
+            "delta_b": -6,
+            "trend": "A_up",
+            "confidence": 0.75,
+            "reasoning_summary": "The point argues about institutional accuracy, not discrimination.",
+            "topic_relevance": 0.95,
+            "argument_quality": 0.75,
+            "crowd_backlash": False,
+            "crowd_backlash_reason": None,
+            "score_change_allowed": True,
+            "scoring_source": "nim",
+        }
+    )
+    orchestrator = build_orchestrator_with_reasoning(reasoning_provider)
+    created = orchestrator.create_debate(
+        CreateDebateRequest(topic="Should AI replace human judges?", participant_a_id="a", participant_b_id="b")
+    )
+    session_id = created.id
+    orchestrator.start_debate(
+        session_id,
+        StartDebateRequest(stance_a="Yes", stance_b="No", active_side=DebateSide.A),
+    )
+
+    response = orchestrator.ingest_utterance(
+        session_id,
+        UtteranceCreate(
+            transcript_text="AI should replace human judges as human judges tend to make errors while AI can be confident every time."
+        ),
+    )
+
+    assert response.live_score.scoring_source == "nim"
+    assert response.live_score.crowd_backlash is False
+    assert response.live_score.side_a_percent == 56
 
 
 def test_nim_failure_is_visible_in_live_score_reasoning():

@@ -1,6 +1,6 @@
 {
-  "/debate/live/page": "app/debate/live/page.js",
-  "/debate/setup/page": "app/debate/setup/page.js",
   "/page": "app/page.js",
+  "/debate/setup/page": "app/debate/setup/page.js",
+  "/debate/live/page": "app/debate/live/page.js",
   "/debate/summary/[id]/page": "app/debate/summary/[id]/page.js"
 }

@@ -417,34 +417,33 @@ def analyze_crowd_signal(text: str) -> CrowdSignal:
     weighted_terms = sum(1 for word in words if word in STRONG_TERMS)
     emotional_hits = sum(1 for word in words if word in EMOTIONAL_TERMS)
     controversial_hits = sum(1 for word in words if word in CONTROVERSIAL_TERMS)
-    toxic_hits = sum(1 for phrase in TOXIC_TERMS if phrase in normalized_text)
-    protected_group_hits = sum(1 for phrase in PROTECTED_GROUP_TERMS if phrase in normalized_text)
-    selection_hits = sum(1 for phrase in SELECTION_VERBS if phrase in normalized_text)
-    exclusion_hits = sum(1 for phrase in EXCLUSION_PHRASES if phrase in normalized_text)
+    toxic_hits = sum(1 for phrase in TOXIC_TERMS if _phrase_in_text(phrase, normalized_text))
+    protected_group_hits = sum(1 for phrase in PROTECTED_GROUP_TERMS if _phrase_in_text(phrase, normalized_text))
+    exclusion_hits = sum(1 for phrase in EXCLUSION_PHRASES if _phrase_in_text(phrase, normalized_text))
     discriminatory_action_hits = sum(
-        1 for phrase in DISCRIMINATORY_ACTION_TERMS if phrase in normalized_text
+        1 for phrase in DISCRIMINATORY_ACTION_TERMS if _phrase_in_text(phrase, normalized_text)
     )
-    dehumanizing_hits = sum(1 for phrase in DEHUMANIZING_TERMS if phrase in normalized_text)
+    dehumanizing_hits = sum(1 for phrase in DEHUMANIZING_TERMS if _phrase_in_text(phrase, normalized_text))
     discriminatory_justification_hits = sum(
-        1 for phrase in DISCRIMINATORY_JUSTIFICATION_TERMS if phrase in normalized_text
+        1 for phrase in DISCRIMINATORY_JUSTIFICATION_TERMS if _phrase_in_text(phrase, normalized_text)
     )
-    vulnerable_person_hits = sum(1 for phrase in VULNERABLE_PERSON_TERMS if phrase in normalized_text)
-    devaluation_hits = sum(1 for phrase in DEVALUATION_TERMS if phrase in normalized_text)
-    avoidance_hits = sum(1 for phrase in AVOIDANCE_TERMS if phrase in normalized_text)
-    birth_context_hits = sum(1 for phrase in BIRTH_CONTEXT_TERMS if phrase in normalized_text)
+    vulnerable_person_hits = sum(1 for phrase in VULNERABLE_PERSON_TERMS if _phrase_in_text(phrase, normalized_text))
+    devaluation_hits = sum(1 for phrase in DEVALUATION_TERMS if _phrase_in_text(phrase, normalized_text))
+    avoidance_hits = sum(1 for phrase in AVOIDANCE_TERMS if _phrase_in_text(phrase, normalized_text))
+    birth_context_hits = sum(1 for phrase in BIRTH_CONTEXT_TERMS if _phrase_in_text(phrase, normalized_text))
     existence_denial_hits = sum(
         1
         for group in PROTECTED_GROUP_TERMS
         for pattern in EXISTENCE_DENIAL_PATTERNS
-        if pattern.format(group=group) in normalized_text
+        if _phrase_in_text(pattern.format(group=group), normalized_text)
     )
     general_exclusion_hits = sum(
         1
         for group in PROTECTED_GROUP_TERMS
         for pattern in GENERAL_EXCLUSION_PATTERNS
-        if pattern.format(group=group) in normalized_text
+        if _phrase_in_text(pattern.format(group=group), normalized_text)
     )
-    amplifier_bonus = sum(1 for phrase in AMPLIFIER_PHRASES if phrase in normalized_text)
+    amplifier_bonus = sum(1 for phrase in AMPLIFIER_PHRASES if _phrase_in_text(phrase, normalized_text))
     contrast_bonus = 3 if any(token in words for token in {"but", "yet", "however"}) else 0
     emphasis_bonus = 2 if len(words) >= 12 and any(token in words for token in {"must", "cannot", "never"}) else 0
 
@@ -507,3 +506,8 @@ def _orientation_from_text(text: str, positive_terms: set[str], negative_terms: 
     if positive_hits == negative_hits:
         return 0
     return 1 if positive_hits > negative_hits else -1
+
+
+def _phrase_in_text(phrase: str, text: str) -> bool:
+    escaped = re.escape(phrase.lower())
+    return re.search(rf"(?<!\w){escaped}(?!\w)", text) is not None

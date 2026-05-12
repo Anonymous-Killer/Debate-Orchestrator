@@ -58,6 +58,23 @@ class LiveScoreService:
             "topic": session.topic,
             "active_side": latest.speaker_side.value,
             "latest_transcript_text": latest.transcript_text,
+            "recent_transcript": [
+                {
+                    "side": turn.speaker_side.value,
+                    "text": turn.transcript_text,
+                    "sequence_no": turn.sequence_no,
+                    "is_latest": turn.id == latest.id,
+                }
+                for turn in recent_turns[-6:]
+            ],
+            "scoring_weight_guidance": {
+                "latest_point_weight": 0.7,
+                "previous_context_weight": 0.3,
+                "instruction": (
+                    "Score the latest point as the main driver. Use previous turns for context, "
+                    "stance consistency, repeated patterns, and momentum only."
+                ),
+            },
             "previous_live_score": session.current_live_score.model_dump(),
         }
         result = self.reasoning_provider.complete_json(
@@ -65,8 +82,24 @@ class LiveScoreService:
                 "You are a debate crowd reaction scorer. "
                 "Return strict JSON with these fields: side_a_percent, side_b_percent, delta_a, delta_b, "
                 "trend, confidence, reasoning_summary, topic_relevance, argument_quality, "
-                "score_change_allowed, scoring_source. "
+                "crowd_backlash, crowd_backlash_reason, score_change_allowed, scoring_source. "
                 "topic_relevance and argument_quality must be numbers from 0.0 to 1.0. "
+                "Decide crowd_backlash using the debate context, not keyword matching alone. "
+                "Set crowd_backlash true only when the latest point would reasonably trigger a strong negative "
+                "audience reaction because it explicitly devalues people, advocates discriminatory exclusion, "
+                "frames a protected or vulnerable person's existence as something to prevent, uses dehumanizing logic, "
+                "or justifies denial of rights/services based on traits such as sex, gender, race, ethnicity, religion, "
+                "disability, class, immigration status, or similar identity/status. "
+                "Do not set crowd_backlash merely because the point criticizes a profession, institution, system, "
+                "role, decision-maker, or policy category. Mentions of financial readiness, hardship, pregnancy, "
+                "abortion, protected groups, or social categories can be normal policy arguments unless the point "
+                "uses them to devalue people, deny rights, or justify exclusion. "
+                "Give the latest point more weight than previous turns: roughly 70 percent of the decision "
+                "should come from latest_transcript_text, while recent_transcript should only provide about "
+                "30 percent for context, stance consistency, repeated patterns, and momentum. "
+                "Do not let older turns overpower the current point unless they reveal a clear repeated pattern. "
+                "Use recent_transcript, topic, active_side, stance_a, and stance_b before deciding. "
+                "If crowd_backlash is true, set score_change_allowed false and reduce the speaker's score. "
                 "score_change_allowed must be false unless the latest point is a meaningful argument connected "
                 "to the debate topic and the speaker's declared stance. "
                 "Filler, greetings, repeated words, hesitation, nonsense, very short non-arguments, and off-topic "
@@ -108,8 +141,7 @@ class LiveScoreService:
         latest: TurnRecord,
         live_score: LiveScore,
     ) -> LiveScore:
-        signal = analyze_crowd_signal(latest.transcript_text)
-        if signal.crowd_backlash:
+        if live_score.crowd_backlash:
             return self._force_crowd_backlash_penalty(session, latest, live_score)
 
         too_low_quality = live_score.topic_relevance < 0.25 or live_score.argument_quality < 0.25
@@ -146,6 +178,8 @@ class LiveScoreService:
             ),
             topic_relevance=live_score.topic_relevance,
             argument_quality=live_score.argument_quality,
+            crowd_backlash=live_score.crowd_backlash,
+            crowd_backlash_reason=live_score.crowd_backlash_reason,
             score_change_allowed=False,
             scoring_source="nim_gated",
         )
@@ -172,13 +206,15 @@ class LiveScoreService:
             trend="A_up" if delta_a > 0 else "B_up" if delta_a < 0 else "steady",
             confidence=max(0.75, live_score.confidence),
             reasoning_summary=(
-                "NIM response was overridden because the point triggered a strong crowd backlash "
-                "for discriminatory or ethically toxic framing."
+                live_score.crowd_backlash_reason
+                or "NIM judged that the point triggered a strong crowd backlash for discriminatory or ethically toxic framing."
             ),
             topic_relevance=live_score.topic_relevance,
             argument_quality=live_score.argument_quality,
+            crowd_backlash=True,
+            crowd_backlash_reason=live_score.crowd_backlash_reason,
             score_change_allowed=False,
-            scoring_source="nim_overridden_crowd_backlash",
+            scoring_source="nim_crowd_backlash",
         )
 
     def _fallback_update(self, session: DebateSession, recent_turns: list[TurnRecord]) -> LiveScore:

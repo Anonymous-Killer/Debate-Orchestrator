@@ -12,6 +12,7 @@
   "tests/test_orchestrator.py::test_live_score_penalizes_professional_sounding_discriminatory_argument",
   "tests/test_orchestrator.py::test_live_score_penalizes_religious_exclusion_argument",
   "tests/test_orchestrator.py::test_live_score_treats_unpredictable_not_beneficial_replacement_argument_as_no_aligned",
+  "tests/test_orchestrator.py::test_nim_does_not_treat_ai_replacing_human_judges_as_discrimination",
   "tests/test_orchestrator.py::test_nim_failure_is_visible_in_live_score_reasoning",
   "tests/test_orchestrator.py::test_nim_scoring_accepts_fractional_percentages_before_gating",
   "tests/test_orchestrator.py::test_nim_scoring_gates_filler_argument_even_if_model_returns_score_increase",

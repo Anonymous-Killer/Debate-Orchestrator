@@ -65,6 +65,8 @@ class LiveScore(BaseModel):
     reasoning_summary: str = "Debate momentum is balanced."
     topic_relevance: float = 0.5
     argument_quality: float = 0.5
+    crowd_backlash: bool = False
+    crowd_backlash_reason: Optional[str] = None
     score_change_allowed: bool = True
     scoring_source: str = "fallback"
     is_provisional: bool = True
@@ -153,6 +155,7 @@ class VerdictRecord(BaseModel):
     weaknesses: list[str]
     deciding_factors: list[str]
     audit_notes: list[str]
+    final_live_score: Optional[LiveScore] = None
 
 
 class SessionEvent(BaseModel):

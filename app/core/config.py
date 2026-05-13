@@ -11,6 +11,11 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 class Settings(BaseModel):
     app_name: str = "Debate Orchestrator"
+    cors_origins: list[str] = [
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+        if origin.strip()
+    ]
     live_score_max_delta: int = 18
     live_score_floor: int = 10
     live_score_ceiling: int = 90

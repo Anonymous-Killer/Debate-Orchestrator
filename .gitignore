@@ -136,6 +136,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -193,6 +195,13 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Frontend
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+frontend/.env.local
+frontend/.env*.local
 
 # Cursor
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
